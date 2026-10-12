@@ -18,13 +18,14 @@ Release/
 *.exp
 *.lib
 
-# Payloads & encrypted blobs
-*.bin
-*.bak
-cipher_pe_only.bak
+# Payloads & encrypted blobs (runtime)
 cipher.bin
-mimi_key.h
+cipher_pe_only.bak
 evasion_blob.bin
+*.bak
+
+# Allow pre-encrypted payloads in payloads/
+!payloads/
 
 # Sensitive
 *.pfx
