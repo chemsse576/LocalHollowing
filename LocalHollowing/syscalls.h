@@ -1,0 +1,5 @@
+#pragma once
+#include <Windows.h>
+
+typedef NTSTATUS(NTAPI* fn_NtAVM)(HANDLE, PVOID*, ULONG_PTR, PSIZE_T, ULONG, ULONG);
+typedef NTSTATUS(NTAPI* fn_NtPVM)(HANDLE, PVOID*, PSIZE_T, ULONG, PULONG);

@@ -1,0 +1,142 @@
+#include <winver.h>
+
+STRINGTABLE
+BEGIN
+    100 "System Performance Monitor - Real-time hardware and software performance tracking utility designed for Windows operating systems including desktop and server editions with comprehensive monitoring capabilities"
+    101 "Monitoring CPU usage across all available processor cores and threads in the current system configuration including support for simultaneous multithreading and hybrid core architectures with detailed frequency tracking"
+    102 "Memory allocation tracking including physical RAM utilization virtual memory page file statistics committed memory working set sizes and per process memory consumption with historical graphing capabilities"
+    103 "Disk I/O performance metrics showing read and write throughput for all mounted storage volumes including NVMe SATA and USB connected drives with queue depth and latency percentile measurements in real time"
+    104 "Network interface bandwidth monitoring with support for Ethernet wireless adapter connections including per connection statistics packet loss detection round trip time measurements and bandwidth utilization graphs"
+    105 "Process list showing running applications with their resource consumption thread count details handle count working set private bytes virtual memory size and parent child process relationship information"
+    106 "System uptime counter displaying elapsed time since the last operating system restart or cold boot including scheduled task history recent restart reasons and planned maintenance window information"
+    107 "Temperature readings from available hardware sensors including CPU package and individual core values with configurable warning thresholds and automatic throttling detection alerts for thermal management"
+    108 "GPU utilization percentage and video memory allocation for supported graphics processing units including dedicated and shared memory usage shader engine activity and display output configuration details"
+    109 "Battery status information including charge level estimated remaining runtime charging rate power source status and battery health percentage with cycle count tracking for portable device deployments"
+    110 "Event log viewer displaying recent system warnings and error entries from the Windows event subsystem with filtering capabilities by source level and time range for efficient troubleshooting workflows"
+END
+
+STRINGTABLE
+BEGIN
+    111 "Service manager showing the status of background services and their automatic startup configuration including dependency trees service account information and recovery action settings for system administrators"
+    112 "Startup programs list with estimated boot time impact analysis for each registered application entry including registry location file path digital signature status and optional disable toggle functionality"
+    113 "Registry performance data collection interface for advanced system diagnostics and troubleshooting with support for custom performance counter categories and real time data provider configuration management"
+    114 "Remote monitoring capability allows connecting to other machines on the local network for centralized view of performance data across multiple servers and workstations using standard Windows management protocols"
+    115 "Export performance data to CSV XML or JSON format for archival purposes and historical trend analysis with configurable column selection date range filtering and automatic scheduled export task creation support"
+    116 "Customizable dashboard layout with drag and drop support for arranging performance monitoring widgets including resizable panels tabbed views and saved layout profiles for different monitoring scenarios"
+    117 "Alert configuration panel for setting threshold values that trigger notification when limits are exceeded with support for email notifications Windows toast messages and custom script execution on threshold breach"
+    118 "Historical data graphing with selectable time ranges from one minute to twenty four hour intervals including zoom capabilities data point interpolation and overlay comparison of multiple metrics on the same chart"
+    119 "Resource usage comparison between multiple running processes with sortable column display options including delta mode percentage view and grouping by application category or user session identifier values"
+    120 "Automatic report generation with scheduling support for daily weekly and monthly summary documents including PDF export branded templates customizable sections and distribution list management capabilities"
+END
+
+STRINGTABLE
+BEGIN
+    121 "Plugin architecture supporting third party extensions for monitoring custom application specific metrics with sandbox isolation managed API access and automatic update distribution through the extension gallery"
+    122 "Integration with Windows Performance Counters providing access to hundreds of built in system metrics including processor memory disk network and application specific counters with custom counter set support"
+    123 "Low overhead design ensuring minimal system resource impact during continuous background monitoring achieved through efficient polling intervals adaptive sampling rates and optimized data storage algorithms"
+    124 "Multi monitor support with independent window positioning and per display DPI scaling awareness including automatic layout adjustment when displays are connected or disconnected during application runtime"
+    125 "Keyboard shortcuts for quick access to frequently used features and navigation between monitoring views with customizable key bindings accessibility support and context sensitive shortcut overlay display"
+    126 "Color coded status indicators using green yellow and red thresholds for at a glance health assessment with customizable color schemes support for color blind accessible palettes and high contrast mode"
+    127 "Tray icon with mini performance graph showing current CPU and memory utilization without opening the main window including customizable graph style tooltip information and left click quick actions menu"
+    128 "Portable mode support allowing the application to run from removable media without installation required including self contained configuration storage and automatic path adjustment for relative file references"
+    129 "Automatic update checking with optional silent background download and installation of new versions including rollback capability update history changelog display and enterprise group policy integration"
+    130 "Accessibility features including high contrast mode screen reader compatibility adjustable font sizes keyboard navigation support custom color themes and user interface scaling options for visual comfort"
+END
+
+STRINGTABLE
+BEGIN
+    131 "Command line interface for scriptable access to performance data collection and reporting functions with structured output formats return code based status indication and batch processing capabilities"
+    132 "Windows Management Instrumentation provider for integration with enterprise monitoring solutions including System Center Operations Manager compatibility and custom WMI class publication support features"
+    133 "Localization support with translations available for twenty three languages including right to left script rendering bidirectional text support and locale specific number date and time formatting options"
+    134 "Digital signature verification ensuring the authenticity and integrity of the application binary files with certificate chain validation timestamp verification and revocation status checking capabilities"
+    135 "Crash dump analysis tool for examining application failures and identifying root cause of system errors including stack trace symbolication module version tracking and automated crash report submission"
+    136 "Disk space analyzer with visual treemap display showing folder sizes and identifying large file clusters including duplicate file detection age based filtering and storage recommendation engine functionality"
+    137 "Handle and DLL viewer showing loaded modules and open handles for any running process in the system including file handles registry keys mutexes semaphores and network socket resource consumption details"
+    138 "TCP and UDP connection table displaying active network connections with remote endpoint information including geographic lookup reverse DNS resolution connection state tracking and bandwidth per connection"
+    139 "IRQ and DMA assignment viewer for diagnosing hardware resource conflicts on legacy system configurations including PCI bus enumeration device manager integration and resource rebalancing recommendations"
+    140 "SMART disk health monitoring with predictive failure analysis for supported solid state and hard drives including wear leveling statistics temperature trending and proactive replacement scheduling alerts"
+END
+
+STRINGTABLE
+BEGIN
+    141 "Power management profile viewer showing current power plan settings and processor frequency scaling with support for creating custom power profiles and switching between profiles based on application detection"
+    142 "Audio device enumeration and volume mixer with per application audio level monitoring capability including peak level meters device property inspection and default device selection management interfaces"
+    143 "Bluetooth device scanner showing paired and nearby devices with signal strength indicators battery level readings connection history and device capability information for wireless peripheral management"
+    144 "USB device tree viewer displaying connected peripherals with their driver version power draw information transfer speed capability and hub topology visualization for universal serial bus diagnostics"
+    145 "Print spooler monitor showing queued documents and printer status for all configured printing devices including print job history page count tracking toner level monitoring and error notification support"
+    146 "Windows Update status checker displaying pending updates recent installation history results with support for update deferral configuration delivery optimization settings and update ring management tools"
+    147 "Firewall rule viewer showing inbound and outbound rules for Windows Defender Firewall configuration including rule creation wizard logging analysis and network profile specific rule management capabilities"
+    148 "Certificate store browser for viewing installed digital certificates and their expiration dates including certificate request generation trust chain analysis and automated renewal reminder notification setup"
+    149 "Environment variable editor with support for both user level and system level variable modifications including path editor with duplicate detection backup and restore functionality and variable expansion preview"
+    150 "Task scheduler interface showing configured scheduled tasks with their trigger conditions run history last execution result and next scheduled run time including task creation and modification capabilities"
+END
+
+STRINGTABLE
+BEGIN
+    200 "Welcome to Contoso Performance Suite version three point two. This application provides comprehensive system monitoring and performance analysis tools for Windows desktop and server operating systems."
+    201 "Getting started with the Performance Monitor is easy. Simply select the metrics you want to track from the sidebar and they will appear on your customizable dashboard with real time updating graphs."
+    202 "For advanced users the command line interface provides scriptable access to all monitoring functions. Use the help command to see available options or consult the documentation for detailed usage examples."
+    203 "The application stores configuration data in the user profile directory under AppData Local Contoso PerfSuite. Portable mode stores configuration alongside the executable for removable media scenarios."
+    204 "Contoso Performance Suite is designed to have minimal impact on system resources. The default polling interval of one second provides a good balance between data freshness and CPU overhead considerations."
+    205 "To configure email notifications for performance alerts navigate to Settings then Alerts then Email Configuration. Enter your SMTP server details and recipient list to receive threshold breach notifications."
+    206 "The plugin system allows third party developers to extend the monitoring capabilities. Plugins are loaded from the Extensions subdirectory and must implement the standard monitoring interface specification."
+    207 "For enterprise deployment use Group Policy or System Center Configuration Manager to distribute the application with preconfigured settings using the provided administrative template and MSI package files."
+    208 "Technical support is available through the Contoso support portal at support dot contoso dot com. Please include your system configuration and application version number when submitting support requests."
+    209 "This software is licensed under the Contoso Enterprise Software License Agreement. Redistribution or reverse engineering of this product is prohibited without express written permission from Contoso Ltd."
+    210 "Release notes for version three point two include improved multi monitor support enhanced accessibility features updated localization strings and several performance optimizations for large scale deployments."
+    211 "Known issues in this release include occasional display artifacts when using remote desktop with hardware acceleration enabled. A workaround is to disable hardware accelerated rendering in the display settings."
+    212 "The performance data logging subsystem writes collected metrics to a local database file which can grow over time. Use the maintenance tools to compact or archive old data and reclaim disk space as needed."
+    213 "Keyboard shortcut reference: Control plus N opens a new monitoring window. Control plus S saves the current layout. F5 refreshes all active monitors. F11 toggles full screen mode for the dashboard view."
+    214 "The network monitoring module supports SNMP version two and three for collecting performance data from network devices such as switches routers and access points with configurable community string settings."
+    215 "Custom performance counter support allows monitoring of application specific metrics exposed through the Windows Performance Counter infrastructure. Use the counter browser to discover available counter categories."
+END
+
+STRINGTABLE
+BEGIN
+    300 "The Windows Performance Data Helper library provides a standardized interface for collecting performance data from the operating system kernel and installed applications through performance counter providers."
+    301 "Thread pool monitoring displays the current state of worker threads and completion port threads in the system thread pool including active thread count queue depth and average completion time per work item."
+    302 "Processor affinity settings allow you to restrict monitoring data collection to specific processor cores which can be useful for isolating performance measurements in multi socket server configurations."
+    303 "The data export scheduler supports automatic periodic export of collected performance metrics to network shared folders with configurable retention policies and automatic cleanup of expired data files."
+    304 "Memory leak detection heuristics analyze the growth pattern of private working set memory for monitored processes and generate warnings when sustained linear growth exceeds configurable threshold values."
+    305 "Disk queue length monitoring provides insight into storage subsystem saturation by tracking the number of pending input output requests for each physical disk including both read and write operations."
+    306 "The remote agent component runs as a lightweight Windows service on monitored machines and exposes collected performance data through authenticated and encrypted network connections for centralized monitoring."
+    307 "Custom dashboard widgets can be created using the built in widget designer which supports configurable data sources display styles color schemes refresh intervals and threshold based visual indicators."
+    308 "Process lifetime tracking records the start time duration and exit code of monitored processes along with resource consumption summaries useful for understanding application behavior patterns over time."
+    309 "The notification engine supports sending alerts through multiple channels simultaneously including email messages desktop notifications event log entries and webhook callbacks to external monitoring systems."
+    310 "Container monitoring integration provides visibility into resource consumption of Windows containers including Hyper V isolation containers and process isolation containers with per container metric collection."
+    311 "Performance baseline comparison allows you to record a baseline measurement and then compare current performance metrics against that baseline with automatic calculation of percentage deviation and trend direction."
+    312 "The diagnostic data collection wizard guides you through capturing a comprehensive system snapshot including running processes loaded drivers installed updates hardware configuration and current resource utilization."
+    313 "Network adapter advanced statistics include receive and transmit buffer utilization interrupt coalescing settings offload capabilities link speed negotiation results and driver version information for each adapter."
+    314 "Application compatibility telemetry integration provides insight into which applications trigger compatibility shims or require elevated privileges with detailed logging of each compatibility intervention and its trigger."
+    315 "Storage spaces monitoring displays the health status and performance metrics of Storage Spaces Direct configurations including virtual disk rebuild progress cache utilization and storage tier data distribution."
+END
+
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 3,2,1,0
+PRODUCTVERSION 3,2,1,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS VOS__WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Contoso Ltd."
+            VALUE "FileDescription", "System Performance Monitor"
+            VALUE "FileVersion", "3.2.1.0"
+            VALUE "InternalName", "perfmon"
+            VALUE "LegalCopyright", "Copyright (C) 2024 Contoso Ltd."
+            VALUE "OriginalFilename", "perfmon.exe"
+            VALUE "ProductName", "Contoso Performance Suite"
+            VALUE "ProductVersion", "3.2.1.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04B0
+    END
+END

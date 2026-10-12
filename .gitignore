@@ -1,0 +1,49 @@
+# Build outputs
+x64/
+Debug/
+Release/
+*.exe
+*.dll
+*.obj
+*.pdb
+*.ilk
+*.log
+*.tlog
+*.idb
+*.ipch
+*.pch
+*.lastbuildstate
+*.iobj
+*.ipdb
+*.exp
+*.lib
+
+# Payloads & encrypted blobs
+*.bin
+*.bak
+cipher_pe_only.bak
+cipher.bin
+mimi_key.h
+evasion_blob.bin
+
+# Sensitive
+*.pfx
+*.cer
+*.key
+*.p12
+
+# VS artifacts
+.vs/
+*.suo
+*.user
+*.sln.docstates
+*.vcxproj.user
+
+# Python
+__pycache__/
+*.pyc
+
+# Misc
+*.ico
+Thumbs.db
+.DS_Store
