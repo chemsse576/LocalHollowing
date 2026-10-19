@@ -63,7 +63,9 @@ Requires Visual Studio 2022+ with C++ desktop workload and Windows SDK.
 
 ## Release
 
-Download the latest release — password-protected zip (`infected`), no build required.
+Download the latest release — password-protected zip, no build required.
+
+**Password:** `infected`
 
 ## Disclaimer
 

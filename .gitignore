@@ -25,8 +25,8 @@ build_out/
 # External toolchains
 ollvm-cl/
 
-# Payloads tracked explicitly — only committed .bin files in payloads/
-!payloads/
+# Payloads — binaries in release only, not in repo
+payloads/*.bin
 *.bak
 
 # Sensitive
