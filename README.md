@@ -4,80 +4,66 @@ PE loader for authorized penetration testing. Loads payloads in-memory via modul
 
 ## Features
 
-- Module stomping (dbghelp.dll as sacrificial DLL)
+- Module stomping (sacrificial DLL)
 - PEB walking with API hashing (DJB2 variant)
 - Indirect syscalls via MASM stubs
 - AES-256 payload decryption (CryptoAPI)
-- ETW patch (EtwEventWrite → xor eax,eax; ret)
+- ETW patch
 - Stack spoofing trampoline
 - Multi-EDR process filters (obfuscated stack strings)
-- Hash unique per build (`__DATE__ __TIME__`)
+- Hash unique per build
 - Full interactive console I/O
+- `/log:file` — write output to file (for WinRM/non-interactive)
 - `@file` support — read commands from file, delete immediately
 
 ## Usage
 
 ```
-ConfigHost.exe <payload.bin> [commands...] [exit]
-ConfigHost.exe <payload.bin> @commands.txt
+ConfigHost.exe <payload.bin> [/log:file] [commands...] [exit]
+ConfigHost.exe <payload.bin> @commands.txt [/log:file]
 ```
 
 ### Examples
 
 ```
-ConfigHost.exe cipher_mimikatz_latest.bin "pv::dbg" "tk::elv" "sk::lp" exit
-```
-
-Or with a command file (deleted after reading):
-```
-ConfigHost.exe cipher_mimikatz_latest.bin @cmds.txt
+ConfigHost.exe cipher_module1.bin "pv::dbg" "tk::elv" "sk::lp" exit
+ConfigHost.exe cipher_module1.bin /log:out.txt "pv::dbg" "sk::lp" exit
+ConfigHost.exe cipher_module1.bin @cmds.txt /log:C:\temp\out.txt
 ```
 
 ## Command Reference
 
-Commands have been renamed from their original names:
+| Alias | Module |
+|-------|--------|
+| sk::lp | Credential extraction |
+| pv::dbg | Enable debug privilege |
+| tk::elv | Token elevation |
+| ld::sm | SAM dump |
+| ld::sc | LSA secrets |
+| ld::ds | DCSync |
+| vt::cr | Vault credentials |
+| kb::pt | Pass the ticket |
+| kb::gd | Golden ticket |
+| kb::ls | List tickets |
 
-| Original | Renamed | Module |
-|----------|---------|--------|
-| sekurlsa | sk | Credential extraction |
-| logonPasswords | lp | Dump logon passwords |
-| pth | ph | Pass the hash |
-| privilege | pv | Privilege management |
-| debug | dbg | Enable debug privilege |
-| token | tk | Token manipulation |
-| elevate | elv | Token elevation |
-| lsadump | ld | LSA database dump |
-| sam | sm | SAM dump |
-| secrets | sc | LSA secrets |
-| dcsync | ds | DCSync |
-| dcshadow | dh | DCShadow |
-| lsa | la | LSA operations |
-| zerologon | zl | Zerologon |
-| vault | vt | Credential vault |
-| cred | cr | Vault credentials |
-| kerberos | kb | Kerberos operations |
-| ptt | pt | Pass the ticket |
-| golden | gd | Golden ticket |
-| list | ls | List tickets |
-| ask | ak | TGS request |
-| tgt | tg | TGT operations |
-| purge | pg | Purge tickets |
-| hash | hs | Hash operations |
+See `command_mapping.txt` in the release for the full mapping.
+
+## Payloads
+
+| File | Description |
+|------|-------------|
+| cipher_module1.bin | Primary credential module |
+| cipher_module2.bin | Privilege escalation module |
+| cipher_module3.bin | Privilege escalation (alt) |
+| cipher_module4.bin | Reverse SOCKS module |
 
 ## Build
 
 Requires Visual Studio 2022+ with C++ desktop workload and Windows SDK.
 
-Build chain uses `build.bat` / `rebuild_all.bat` in the confighost_build directory (ml64 + cl + link).
-
 ## Release
 
-Download the latest release for a ready-to-run package — no build required:
-- `ConfigHost.exe` — the loader
-- `cipher_mimikatz_latest.bin` — encrypted payload (current)
-- `cipher_printspoofer.bin` — PrintSpoofer payload
-- `cipher_revsocks.bin` — RevSocks payload
-- `command_mapping.txt` — full command name mapping reference
+Download the latest release — password-protected zip (`infected`), no build required.
 
 ## Disclaimer
 
@@ -85,8 +71,4 @@ Download the latest release for a ready-to-run package — no build required:
 
 This software is intended to be used by security professionals during authorized penetration testing engagements, red team operations, and security research. Unauthorized use of this tool against systems you do not own or have explicit written permission to test is illegal and unethical.
 
-The author assumes no liability for misuse of this software. By using this tool, you agree that you are solely responsible for your actions and that you will comply with all applicable local, state, national, and international laws.
-
-## License
-
-For educational and authorized security testing use only.
+The author assumes no liability for misuse of this software.
