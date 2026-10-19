@@ -17,22 +17,17 @@ Release/
 *.ipdb
 *.exp
 *.lib
-
-# Payloads & encrypted blobs (runtime)
-cipher.bin
-cipher_pe_only.bak
-evasion_blob.bin
-*.bak
 *.res
 
 # Build artifacts
 build_out/
 
-# External toolchains (too large)
+# External toolchains
 ollvm-cl/
 
-# Allow pre-encrypted payloads in payloads/
+# Payloads tracked explicitly — only committed .bin files in payloads/
 !payloads/
+*.bak
 
 # Sensitive
 *.pfx
@@ -46,6 +41,9 @@ ollvm-cl/
 *.user
 *.sln.docstates
 *.vcxproj.user
+
+# Claude Code
+.claude/
 
 # Python
 __pycache__/
