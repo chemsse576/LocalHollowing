@@ -23,6 +23,13 @@ cipher.bin
 cipher_pe_only.bak
 evasion_blob.bin
 *.bak
+*.res
+
+# Build artifacts
+build_out/
+
+# External toolchains (too large)
+ollvm-cl/
 
 # Allow pre-encrypted payloads in payloads/
 !payloads/

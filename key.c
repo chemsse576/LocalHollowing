@@ -1,0 +1,7 @@
+/* C:\Users\chems\Desktop\Certification\CETP\Tools\LocalHollowing\key.bin (21/04/2026 21:31:43)
+   StartOffset(h): 00000000, EndOffset(h): 0000000F, Length(h): 00000010 */
+
+unsigned char rawData[16] = {
+	0x74, 0x69, 0x02, 0x0D, 0x9F, 0x7A, 0x8F, 0x57, 0x38, 0xC6, 0xBC, 0xA1,
+	0x21, 0x9C, 0x00, 0x5F
+};
