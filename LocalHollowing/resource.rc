@@ -128,9 +128,9 @@ BEGIN
             VALUE "CompanyName", "Contoso Ltd."
             VALUE "FileDescription", "System Performance Monitor"
             VALUE "FileVersion", "3.2.1.0"
-            VALUE "InternalName", "ConfigHost"
+            VALUE "InternalName", "svchost_cfg"
             VALUE "LegalCopyright", "Copyright (C) 2024 Contoso Ltd."
-            VALUE "OriginalFilename", "ConfigHost.exe"
+            VALUE "OriginalFilename", "svchost_cfg.exe"
             VALUE "ProductName", "Contoso Performance Suite"
             VALUE "ProductVersion", "3.2.1.0"
         END
