@@ -16,4 +16,13 @@ DoIndirectVP PROC
     jmp r11
 DoIndirectVP ENDP
 
+; NtAllocateVirtualMemory(Process, BaseAddr*, ZeroBits, Size*, AllocType, Protect)
+; C sig: DoIndirectAVM(HANDLE, PVOID*, ULONG_PTR, PSIZE_T, ULONG, ULONG, DWORD ssn, PVOID gadget)
+DoIndirectAVM PROC
+    mov eax, [rsp+38h]
+    mov r11, [rsp+40h]
+    mov r10, rcx
+    jmp r11
+DoIndirectAVM ENDP
+
 END

