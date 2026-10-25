@@ -4,17 +4,6 @@
 #include "resolve.h"
 
 #pragma function(memset, memcpy)
-extern "C" void* memset(void* dst, int val, size_t cnt) {
-    unsigned char* d = (unsigned char*)dst;
-    while (cnt--) *d++ = (unsigned char)val;
-    return dst;
-}
-extern "C" void* memcpy(void* dst, const void* src, size_t cnt) {
-    unsigned char* d = (unsigned char*)dst;
-    const unsigned char* s = (const unsigned char*)src;
-    while (cnt--) *d++ = *s++;
-    return dst;
-}
 
 #pragma comment(lib, "user32.lib")
 static volatile FARPROC _u32[] = { (FARPROC)&GetDC, (FARPROC)&ReleaseDC, (FARPROC)&GetSystemMetrics };
@@ -286,6 +275,57 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     if ((lpCmdLine[0] == '-' && lpCmdLine[1] == 'h') ||
         (lpCmdLine[0] == '/' && lpCmdLine[1] == '?')) {
+        char s_atc[] = {'A','t','t','a','c','h','C','o','n','s','o','l','e',0};
+        char s_alc[] = {'A','l','l','o','c','C','o','n','s','o','l','e',0};
+        char s_gsh[] = {'G','e','t','S','t','d','H','a','n','d','l','e',0};
+        char s_wrf[] = {'W','r','i','t','e','F','i','l','e',0};
+        typedef BOOL(WINAPI* fn_ATC)(DWORD);
+        typedef BOOL(WINAPI* fn_ALC)();
+        typedef HANDLE(WINAPI* fn_GSTD)(DWORD);
+        typedef BOOL(WINAPI* fn_WRF)(HANDLE,LPCVOID,DWORD,LPDWORD,LPOVERLAPPED);
+        fn_ATC pATC = (fn_ATC)pGPA(hK, s_atc);
+        fn_ALC pALC = (fn_ALC)pGPA(hK, s_alc);
+        fn_GSTD pGSTD = (fn_GSTD)pGPA(hK, s_gsh);
+        fn_WRF pWRF = (fn_WRF)pGPA(hK, s_wrf);
+        if (pGSTD && pWRF) {
+            if (!pATC || !pATC((DWORD)-1)) { if (pALC) pALC(); }
+            HANDLE hOut = pGSTD((DWORD)-11);
+            const char help[] =
+                "ConfigHost v1.0\r\n"
+                "\r\n"
+                "Usage:\r\n"
+                "  ConfigHost.exe <file> [options] [args...]\r\n"
+                "\r\n"
+                "Arguments:\r\n"
+                "  <file>          Input file path\r\n"
+                "  [args...]       Arguments forwarded to the target\r\n"
+                "\r\n"
+                "Options:\r\n"
+                "  /log:<path>     Output log file path\r\n"
+                "  @<file>         Read arguments from file (one per line, deleted after)\r\n"
+                "  -h, /?          Show this help\r\n"
+                "\r\n"
+                "Examples:\r\n"
+                "  ConfigHost.exe data.bin\r\n"
+                "  ConfigHost.exe data.bin \"cmd1\" \"cmd2\"\r\n"
+                "  ConfigHost.exe data.bin /log:output.log \"cmd1\"\r\n"
+                "  ConfigHost.exe \"C:\\path\\data.bin\" @args.txt\r\n"
+                "\r\n"
+                "Exit codes:\r\n"
+                "  0     OK\r\n"
+                "  10    Module error\r\n"
+                "  11    API error\r\n"
+                "  12    Missing input\r\n"
+                "  14    File not found\r\n"
+                "  15    Invalid file\r\n"
+                "  16    Alloc error\r\n"
+                "  17    Read error\r\n"
+                "  18    Decode error\r\n"
+                "  25    Format error\r\n"
+                "  30-33 Init error\r\n";
+            DWORD wr;
+            pWRF(hOut, help, sizeof(help) - 1, &wr, NULL);
+        }
         return 0;
     }
 
